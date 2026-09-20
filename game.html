@@ -524,6 +524,51 @@ class FloorPaint{
 
   drop(x,z,r,L,yellow=false,gut=false){ const g=this.g,[cx,cy]=this.px(x,z),C=this.gooColors(L); g.fillStyle=gut?C.gut(0.8):yellow?C.goo(0.85):C.coreA(0.85); g.beginPath(); g.ellipse(cx,cy,r*this.ppm*rand(1,1.8),r*this.ppm,rand(TAU),0,TAU); g.fill(); this.dirty=true; }
   scorch(x,z,r){ const g=this.g,[cx,cy]=this.px(x,z),S=r*this.ppm; const gr=g.createRadialGradient(cx,cy,0,cx,cy,S); gr.addColorStop(0,'rgba(20,12,6,0.55)'); gr.addColorStop(0.6,'rgba(30,18,8,0.25)'); gr.addColorStop(1,'rgba(30,18,8,0)'); g.fillStyle=gr; g.beginPath(); g.arc(cx,cy,S,0,TAU); g.fill(); this.dirty=true; }
+  crater(x,z,r=1.2){
+    const g=this.g, [cx,cy]=this.px(x,z), S=r*this.ppm;
+    g.save();
+    // 1. 核心深度碳化弹坑
+    const gr=g.createRadialGradient(cx,cy,0,cx,cy,S);
+    gr.addColorStop(0,'rgba(10,5,2,0.96)');
+    gr.addColorStop(0.35,'rgba(28,15,6,0.85)');
+    gr.addColorStop(0.7,'rgba(60,25,10,0.5)');
+    gr.addColorStop(1,'rgba(60,25,10,0)');
+    g.fillStyle=gr;
+    g.beginPath();
+    g.arc(cx,cy,S,0,TAU);
+    g.fill();
+    // 2. 龟裂碎裂放射状深渊裂纹 (Cracks)
+    g.strokeStyle='rgba(15,8,3,0.9)';
+    g.lineCap='round';
+    const numCracks = 18;
+    for(let i=0;i<numCracks;i++){
+      const ang = (i / numCracks)*TAU + rand(-0.15,0.15);
+      const len = S * rand(0.65, 1.35);
+      let curX = cx, curY = cy;
+      g.lineWidth = rand(2.5, 6.0);
+      g.beginPath();
+      g.moveTo(curX, curY);
+      const segments = 4 + Math.floor(Math.random()*4);
+      for(let s=0; s<segments; s++){
+        const frac = (s+1)/segments;
+        const curAng = ang + rand(-0.35, 0.35);
+        curX = cx + Math.cos(curAng)*len*frac;
+        curY = cy + Math.sin(curAng)*len*frac;
+        g.lineTo(curX, curY);
+      }
+      g.stroke();
+    }
+    // 3. 高爆冲击波外圈焦黑颗粒残渣
+    g.fillStyle='rgba(20,10,5,0.75)';
+    for(let i=0;i<60;i++){
+      const a=rand(TAU), d=S*rand(0.2,1.2), sz=rand(2,8);
+      g.beginPath();
+      g.arc(cx+Math.cos(a)*d, cy+Math.sin(a)*d, sz, 0, TAU);
+      g.fill();
+    }
+    g.restore();
+    this.dirty=true;
+  }
   bait(kind,x,z){
     const g=this.g,[cx,cy]=this.px(x,z),S=this.ppm; g.save(); g.translate(cx,cy);
     if(kind==='cola'){ const gr=g.createRadialGradient(0,0,S*0.05,0,0,S*0.36); gr.addColorStop(0,'rgba(70,32,12,0.75)'); gr.addColorStop(0.8,'rgba(70,32,12,0.55)'); gr.addColorStop(1,'rgba(70,32,12,0)'); g.fillStyle=gr; g.beginPath(); for(let i=0;i<=24;i++){ const a=i/24*TAU, r=S*0.34*(0.85+0.15*Math.sin(a*3+1)); i?g.lineTo(Math.cos(a)*r,Math.sin(a)*r):g.moveTo(Math.cos(a)*r,Math.sin(a)*r); } g.fill(); g.fillStyle='rgba(255,255,255,0.22)'; g.beginPath(); g.ellipse(-S*0.08,-S*0.1,S*0.1,S*0.04,-0.5,0,TAU); g.fill(); }
@@ -714,34 +759,46 @@ function makeItem(kind){
   const g=new THREE.Group();
   switch(kind){
     case 'yamato':{
-      // 大和460mm三联装主炮塔
-      const steelMat = M.std(0x3a3f47, {metalness:0.8, roughness:0.25});
-      const darkMat = M.std(0x1a1c20, {metalness:0.9, roughness:0.3});
-      const brassMat = M.std(0xd4af37, {metalness:0.85, roughness:0.2});
-      // 炮塔基座装甲盒 (斜角多面体效果)
-      const base = box(0.24, 0.08, 0.28, steelMat, 0, 0.04, -0.04);
-      g.add(base);
-      const topPlate = box(0.22, 0.03, 0.24, darkMat, 0, 0.09, -0.03);
-      g.add(topPlate);
-      // 测距仪天线耳
-      const rangeL = box(0.04, 0.03, 0.05, steelMat, -0.14, 0.07, -0.04);
-      const rangeR = box(0.04, 0.03, 0.05, steelMat, 0.14, 0.07, -0.04);
-      g.add(rangeL); g.add(rangeR);
-      // 3根巨大主炮管 (46cm口径)
-      for(const xOffset of [-0.065, 0, 0.065]){
-        // 炮口防盾/防水布
-        const blastBag = cyl(0.022, 0.024, 0.04, M.std(0xf0eee5, {roughness:0.9}), xOffset, 0.055, 0.11, 16);
+      // 舰炮：三联装重型舰炮，俯角直指地面
+      const steelMat = M.std(0x2f343b, {metalness:0.85, roughness:0.25});
+      const darkMat = M.std(0x181a1d, {metalness:0.92, roughness:0.2});
+      const brassMat = M.std(0xd4af37, {metalness:0.9, roughness:0.18});
+      const boreMat = M.std(0x050505, {metalness:0.2, roughness:0.9}); // 幽深炮膛黑洞
+      
+      const head = new THREE.Group();
+      // 炮塔主体：沉稳厚重的装甲防护罩
+      const base = box(0.28, 0.11, 0.24, steelMat, 0, 0, 0);
+      head.add(base);
+      const topPlate = box(0.25, 0.04, 0.22, darkMat, 0, 0.07, 0);
+      head.add(topPlate);
+      // 左右光学测距仪耳
+      const rangeL = box(0.05, 0.04, 0.06, steelMat, -0.165, 0.02, 0);
+      const rangeR = box(0.05, 0.04, 0.06, steelMat, 0.165, 0.02, 0);
+      head.add(rangeL); head.add(rangeR);
+      
+      // 3根巨型炮管（直接朝向地面，俯角大角度下探）
+      for(const xOffset of [-0.072, 0, 0.072]){
+        // 炮根防水帆布罩
+        const blastBag = cyl(0.024, 0.026, 0.06, M.std(0xddd8cc, {roughness:0.95}), xOffset, -0.01, 0.13, 16);
         blastBag.rotation.x = Math.PI / 2;
-        g.add(blastBag);
+        head.add(blastBag);
         // 主炮身
-        const barrel = cyl(0.016, 0.014, 0.38, steelMat, xOffset, 0.055, 0.31, 16);
+        const barrel = cyl(0.018, 0.015, 0.42, steelMat, xOffset, -0.01, 0.35, 16);
         barrel.rotation.x = Math.PI / 2;
-        g.add(barrel);
-        // 炮口制退/炮箍
-        const muzzle = cyl(0.017, 0.017, 0.03, brassMat, xOffset, 0.055, 0.49, 16);
+        head.add(barrel);
+        // 炮口加重箍与制退环
+        const muzzle = cyl(0.019, 0.019, 0.04, brassMat, xOffset, -0.01, 0.55, 16);
         muzzle.rotation.x = Math.PI / 2;
-        g.add(muzzle);
+        head.add(muzzle);
+        // 460mm 炮膛内壁黑洞 (从俯视看极具压迫感)
+        const bore = cyl(0.013, 0.013, 0.01, boreMat, xOffset, -0.01, 0.575, 16);
+        bore.rotation.x = Math.PI / 2;
+        head.add(bore);
       }
+      // 核心调整：炮口直指地面！倾角向前下探78度 (-1.36 rad)
+      head.rotation.x = -1.36;
+      head.position.y = 0.05;
+      g.add(head);
       break;
     }
     case 'slipper':{ const sh=new THREE.Shape(); sh.moveTo(-0.05,-0.13); sh.quadraticCurveTo(-0.07,0,-0.055,0.11); sh.quadraticCurveTo(-0.03,0.145,0,0.145); sh.quadraticCurveTo(0.055,0.14,0.055,0.09); sh.quadraticCurveTo(0.06,-0.02,0.045,-0.13); sh.quadraticCurveTo(0,-0.15,-0.05,-0.13);
@@ -1688,7 +1745,7 @@ const ITEMS={
   rice:{bait:{radius:1.8,amount:18,spread:0.10,boost:5},hover:0.16},
 };
 const SLOT_ORDER=['yamato','hand','slipper','tissue','book','pan','spray','flame','vacuum'];
-const LABEL={yamato:'大和460',hand:'徒手',slipper:'拖鞋',tissue:'纸巾',book:'书本',pan:'平底锅',spray:'杀虫喷雾',flame:'火焰',vacuum:'吸尘器',bone:'鸡骨头',cola:'可乐',rice:'米饭'};
+const LABEL={yamato:'舰炮',hand:'徒手',slipper:'拖鞋',tissue:'纸巾',book:'书本',pan:'平底锅',spray:'杀虫喷雾',flame:'火焰',vacuum:'吸尘器',bone:'鸡骨头',cola:'可乐',rice:'米饭'};
 const BAIT_SLOTS=['bone','cola','rice'];
 const LETHAL_ORDER=['yamato','hand','tissue','slipper','book','pan','vacuum','spray','flame'];
 const ROACH_R=0.05;
@@ -1986,12 +2043,8 @@ class Round1{
         this.puffs.emit('flame', px, 0.05, pz, Math.cos(ang)*rand(1,3), Math.sin(ang)*rand(1,3), 8, rand(4.5,8.0));
         if(i%2===0) this.puffs.emit('spray', px, 0.1, pz, Math.cos(ang)*rand(0.5,2), Math.sin(ang)*rand(0.5,2), 6, rand(3.0,6.0));
       }
-      // 覆盖大半个房间的核爆级烧蚀焦黑深坑印记
-      for(let ox of [-0.6, 0, 0.6]){
-        for(let oz of [-0.6, 0, 0.6]){
-          this.G.paint.splat(x+ox, z+oz, 0, 1, 0.85, 1, 'flame');
-        }
-      }
+      // 毁灭级深渊巨型弹坑与裂纹焦痕
+      this.G.paint.crater(x, z, 1.45);
     }
 
     this.scare(x,z,R+0.18);
@@ -2063,7 +2116,14 @@ class Round1{
 
     const hoverOn=inp.lastType==='mouse'&&inp.mouse.live&&!this.strikes.length&&!this.hold&&!this.intro;
     for(const k in this.itemMeshes){ const m=this.itemMeshes[k]; if(m.userData.busy) continue; if(this.hold&&this.hold.item===k) continue; m.visible=(hoverOn&&k===this.item); }
-    if(hoverOn){ if(inp.mouse.x!==this.lastMx||inp.mouse.y!==this.lastMy){ this.lastMx=inp.mouse.x; this.lastMy=inp.mouse.y; this.touch(); } const p=this.floorPoint(inp.mouse.x,inp.mouse.y); if(p){ const m=this.itemMeshes[this.item]; this.hoverT+=dt; if(m.userData.yawFor!==this.item){ m.userData.yawFor=this.item; m.userData.yaw=this.itemYaw(this.item); } m.position.set(p.x,(it.hover||0.15)+Math.sin(this.hoverT*3)*0.01,p.z); m.rotation.set(0,it.cone?Math.atan2(G.camUp.x,G.camUp.z):m.userData.yaw,0); } }
+    if(hoverOn){ if(inp.mouse.x!==this.lastMx||inp.mouse.y!==this.lastMy){ this.lastMx=inp.mouse.x; this.lastMy=inp.mouse.y; this.touch(); } const p=this.floorPoint(inp.mouse.x,inp.mouse.y); if(p){ const m=this.itemMeshes[this.item]; this.hoverT+=dt; if(m.userData.yawFor!==this.item){ m.userData.yawFor=this.item; m.userData.yaw=this.itemYaw(this.item); } if(this.item==='yamato'){
+          // 舰炮高悬于战场上方，炮身垂直/高角度俯瞰地面目标
+          m.position.set(p.x, 0.48 + Math.sin(this.hoverT*3)*0.015, p.z);
+          m.rotation.set(0, m.userData.yaw, 0);
+        } else {
+          m.position.set(p.x,(it.hover||0.15)+Math.sin(this.hoverT*3)*0.01,p.z);
+          m.rotation.set(0,it.cone?Math.atan2(G.camUp.x,G.camUp.z):m.userData.yaw,0);
+        } } }
     for(let i=this.strikes.length-1;i>=0;i--){ const s=this.strikes[i], sit=ITEMS[s.item], m=s.m; s.t+=dt; m.visible=true;
       if(s.item==='yamato'){
         // 舰炮开火：炮台悬停后坐力开火，而非肉身砸地
