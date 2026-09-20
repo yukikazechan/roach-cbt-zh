@@ -2052,7 +2052,40 @@ class Round1{
     for(const k in this.itemMeshes){ const m=this.itemMeshes[k]; if(m.userData.busy) continue; if(this.hold&&this.hold.item===k) continue; m.visible=(hoverOn&&k===this.item); }
     if(hoverOn){ if(inp.mouse.x!==this.lastMx||inp.mouse.y!==this.lastMy){ this.lastMx=inp.mouse.x; this.lastMy=inp.mouse.y; this.touch(); } const p=this.floorPoint(inp.mouse.x,inp.mouse.y); if(p){ const m=this.itemMeshes[this.item]; this.hoverT+=dt; if(m.userData.yawFor!==this.item){ m.userData.yawFor=this.item; m.userData.yaw=this.itemYaw(this.item); } m.position.set(p.x,(it.hover||0.15)+Math.sin(this.hoverT*3)*0.01,p.z); m.rotation.set(0,it.cone?Math.atan2(G.camUp.x,G.camUp.z):m.userData.yaw,0); } }
     for(let i=this.strikes.length-1;i>=0;i--){ const s=this.strikes[i], sit=ITEMS[s.item], m=s.m; s.t+=dt; m.visible=true;
-      if(s.phase==='windup'){ const k=Math.min(1,s.t/sit.windup), e=k*k; m.position.set(lerp(s.from.x,s.x,e),lerp(s.from.y,0.006,e),lerp(s.from.z,s.z,e)); m.rotation.set(-0.3*(1-e),s.yaw,0);
+      if(s.item==='yamato'){
+        // 舰炮开火：炮台悬停后坐力开火，而非肉身砸地
+        const U=this.G.camUp;
+        const originY = sit.hover + 0.12;
+        if(s.phase==='windup'){
+          const k=Math.min(1,s.t/sit.windup);
+          // 炮塔瞄准并略微抬升蓄能
+          m.position.set(s.from.x, originY + k*0.04, s.from.z);
+          m.rotation.set(-0.15*k, s.yaw, 0);
+          if(k>=1){
+            s.phase='rest'; s.t=0;
+            // 剧烈开火后坐力震颤
+            m.position.set(s.from.x - Math.sin(s.yaw)*0.12, originY + 0.08, s.from.z - Math.cos(s.yaw)*0.12);
+            m.rotation.set(0.25, s.yaw, 0);
+            // 炮口火光与高爆弹道轨迹粒子
+            for(let p=0; p<=8; p++){
+              const f = p / 8;
+              const tx = lerp(s.from.x, s.x, f);
+              const tz = lerp(s.from.z, s.z, f);
+              const ty = lerp(originY + 0.05, 0.01, f);
+              this.puffs.emit('flame', tx, ty, tz, 0, 0, 8, 2.5);
+            }
+            this.impact(s.x, s.z, s.item);
+          }
+        } else if(s.phase==='rest'){
+          const k=Math.min(1,s.t/sit.rest);
+          // 后坐力复进归位
+          m.position.set(lerp(s.from.x - Math.sin(s.yaw)*0.12, s.from.x, k), lerp(originY+0.08, originY, k), lerp(s.from.z - Math.cos(s.yaw)*0.12, s.from.z, k));
+          m.rotation.set(lerp(0.25, 0, k), s.yaw, 0);
+          if(k>=1){ s.phase='up'; s.t=0; }
+        } else {
+          this.freeStrike(s); this.strikes.splice(i,1);
+        }
+      } else if(s.phase==='windup'){ const k=Math.min(1,s.t/sit.windup), e=k*k; m.position.set(lerp(s.from.x,s.x,e),lerp(s.from.y,0.006,e),lerp(s.from.z,s.z,e)); m.rotation.set(-0.3*(1-e),s.yaw,0);
         if(k>=1){ s.phase='rest'; s.t=0; m.position.set(s.x,0.006,s.z); m.rotation.set(0,s.yaw,0); this.impact(s.x,s.z,s.item); } }
       else if(s.phase==='rest'){ if(s.t>=sit.rest){ s.phase='up'; s.t=0; } }
       else { const k=Math.min(1,s.t/0.16); m.position.y=lerp(0.006,(sit.hover||0.2)+0.22,k*k); if(k>=1){ this.freeStrike(s); this.strikes.splice(i,1); } }
