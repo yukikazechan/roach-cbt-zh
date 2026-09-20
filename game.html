@@ -796,7 +796,7 @@ function makeItem(kind){
         head.add(bore);
       }
       // 核心调整：炮口直指地面！倾角向前下探78度 (-1.36 rad)
-      head.rotation.x = -1.36;
+      head.rotation.x = -0.52;
       head.position.y = 0.05;
       g.add(head);
       break;
@@ -2058,7 +2058,7 @@ class Round1{
 
 
   itemYaw(k){ const U=this.G.camUp; const up=Math.atan2(U.x,U.z);
-    if(k==='yamato') return up+Math.PI; if(k==='pan') return up+Math.PI; if(k==='hand') return up; if(k==='slipper') return up+rand(-0.35,0.35); if(k==='book') return rand(-0.6,0.6); if(k==='tissue') return rand(TAU); return up; }
+    if(k==='yamato') return up; if(k==='pan') return up+Math.PI; if(k==='hand') return up; if(k==='slipper') return up+rand(-0.35,0.35); if(k==='book') return rand(-0.6,0.6); if(k==='tissue') return rand(TAU); return up; }
   press(sx,sy,type,pid){ if(!this.active||this.intro) return; const p=this.floorPoint(sx,sy); if(!p) return; this.touch(); const it=ITEMS[this.item];
     if(it.bait){ this.placeBait(this.item,p.x,p.z); return; }
     if(it.hold){ this.startHold(p.x,p.z,pid); return; }
