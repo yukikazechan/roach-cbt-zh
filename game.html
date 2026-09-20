@@ -32,6 +32,8 @@ button{font-family:inherit;color:inherit;border:0;background:none;padding:0;marg
 @media (max-height:540px){ #wcol{display:grid;grid-template-columns:repeat(2,60px)} }
 .slot{width:60px;height:40px;border-radius:12px;background:var(--ivory);color:var(--ink);font-size:13px;font-weight:700;letter-spacing:-.02em;box-shadow:0 2px 0 var(--edge),0 4px 10px rgba(80,50,20,.28);display:grid;place-items:center;position:relative;transition:transform .08s,box-shadow .08s;white-space:nowrap}
 .slot.bait{background:var(--ivory2)}
+.slot[data-item="yamato"]{background:linear-gradient(135deg,#3a3f47,#1e2229);color:#ffcc00;border:1px solid #d4af37;text-shadow:0 0 6px rgba(255,204,0,.7);font-weight:900}
+.slot[data-item="yamato"].sel{background:linear-gradient(135deg,#8a1a1a,#4a0e0e);color:#fff;border-color:#ff4444;box-shadow:0 0 14px rgba(255,50,50,.8)}
 .slot.sel{background:var(--ink);color:var(--ivory);transform:scale(1.06);box-shadow:0 2px 0 var(--ink2),0 4px 10px rgba(80,50,20,.35)}
 .slot:active{transform:translateY(2px)}
 #kills{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));font-family:var(--serif);font-size:30px;line-height:1;color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.5);opacity:0;transition:opacity .4s}
@@ -328,6 +330,14 @@ class AudioFX{
     this.noise({t:delay+0.012,dur:0.17,gain:0.5*g,freq:bp(720*p),q:1.6,freqEnd:200,type:'lowpass',pan});
     switch(weapon){
       case 'slipper': this.noise({t:delay,dur:0.045,gain:0.7*g,freq:700,q:0.6,freqEnd:250,pan}); break;
+      case 'yamato':
+        // 460mm 巨炮开火轰鸣：极低频震耳穿甲爆炸 + 空气撕裂爆鸣
+        for(let i=0;i<4;i++){
+          this.noise({t:delay+i*0.04, dur:0.65, gain:2.2*g*hi, freq:80, q:0.4, type:'lowpass', freqEnd:35, pan});
+          this.tone({t:delay+i*0.03, dur:0.8, gain:0.9*g*hi, freq:65/(1+i*0.1), freqEnd:22, type:'sawtooth', pan});
+        }
+        this.noise({t:delay, dur:0.25, gain:1.8*g*hi, freq:bp(2400), q:0.6, pan});
+        break;
       case 'pan': for(const f of [1240,2870,4300]) this.tone({t:delay,dur:0.32,gain:0.09*g*hi,freq:f*(1+Math.random()*0.01),type:'sine',pan}); this.noise({t:delay,dur:0.03,gain:0.6*g*hi,freq:bp(3200),q:0.5,pan}); this.noise({t:delay,dur:0.09,gain:0.6*g,freq:800,q:1,freqEnd:300,pan}); break;
       case 'book': this.noise({t:delay,dur:0.14,gain:0.9*g,freq:260,q:0.7,type:'lowpass',freqEnd:120,pan}); break;
       case 'tissue': this.noise({t:delay,dur:0.22,gain:0.6*g,freq:420,q:1.2,type:'lowpass',freqEnd:160,pan}); break;
@@ -340,6 +350,10 @@ class AudioFX{
   miss(weapon,pan=0){
     if(!this.ctx) return;
     switch(weapon){
+      case 'yamato':
+        this.noise({dur:0.5, gain:1.9, freq:85, q:0.5, type:'lowpass', freqEnd:30, pan});
+        this.tone({dur:0.65, gain:0.8, freq:70, freqEnd:20, type:'sawtooth', pan});
+        break;
       case 'hand': this.noise({dur:0.03,gain:0.6,freq:1400,q:0.5,pan}); this.tone({dur:0.06,gain:0.25,freq:110,freqEnd:50,pan}); break;
       case 'slipper': this.noise({dur:0.05,gain:0.7,freq:650,q:0.6,freqEnd:220,pan}); this.tone({dur:0.07,gain:0.3,freq:120,freqEnd:45,pan}); break;
       case 'pan': for(const f of [1240,2870,4300]) this.tone({dur:0.5,gain:0.14,freq:f,pan}); this.noise({dur:0.03,gain:0.6,freq:3400,q:0.5,pan}); this.tone({dur:0.09,gain:0.35,freq:130,freqEnd:45,pan}); break;
@@ -699,6 +713,37 @@ function oothecaGeo(){
 function makeItem(kind){
   const g=new THREE.Group();
   switch(kind){
+    case 'yamato':{
+      // 大和460mm三联装主炮塔
+      const steelMat = M.std(0x3a3f47, {metalness:0.8, roughness:0.25});
+      const darkMat = M.std(0x1a1c20, {metalness:0.9, roughness:0.3});
+      const brassMat = M.std(0xd4af37, {metalness:0.85, roughness:0.2});
+      // 炮塔基座装甲盒 (斜角多面体效果)
+      const base = box(0.24, 0.08, 0.28, steelMat, 0, 0.04, -0.04);
+      g.add(base);
+      const topPlate = box(0.22, 0.03, 0.24, darkMat, 0, 0.09, -0.03);
+      g.add(topPlate);
+      // 测距仪天线耳
+      const rangeL = box(0.04, 0.03, 0.05, steelMat, -0.14, 0.07, -0.04);
+      const rangeR = box(0.04, 0.03, 0.05, steelMat, 0.14, 0.07, -0.04);
+      g.add(rangeL); g.add(rangeR);
+      // 3根巨大主炮管 (46cm口径)
+      for(const xOffset of [-0.065, 0, 0.065]){
+        // 炮口防盾/防水布
+        const blastBag = cyl(0.022, 0.024, 0.04, M.std(0xf0eee5, {roughness:0.9}), xOffset, 0.055, 0.11, 16);
+        blastBag.rotation.x = Math.PI / 2;
+        g.add(blastBag);
+        // 主炮身
+        const barrel = cyl(0.016, 0.014, 0.38, steelMat, xOffset, 0.055, 0.31, 16);
+        barrel.rotation.x = Math.PI / 2;
+        g.add(barrel);
+        // 炮口制退/炮箍
+        const muzzle = cyl(0.017, 0.017, 0.03, brassMat, xOffset, 0.055, 0.49, 16);
+        muzzle.rotation.x = Math.PI / 2;
+        g.add(muzzle);
+      }
+      break;
+    }
     case 'slipper':{ const sh=new THREE.Shape(); sh.moveTo(-0.05,-0.13); sh.quadraticCurveTo(-0.07,0,-0.055,0.11); sh.quadraticCurveTo(-0.03,0.145,0,0.145); sh.quadraticCurveTo(0.055,0.14,0.055,0.09); sh.quadraticCurveTo(0.06,-0.02,0.045,-0.13); sh.quadraticCurveTo(0,-0.15,-0.05,-0.13);
       const sole=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:0.025,bevelEnabled:true,bevelSize:0.004,bevelThickness:0.004,bevelSegments:2}),MAT.black); sole.rotation.x=-Math.PI/2; sole.position.y=0.03; sole.castShadow=true; g.add(sole);
       const strap=new THREE.Mesh(new THREE.TorusGeometry(0.052,0.014,8,14,Math.PI),M.std(0x2c2c32)); strap.position.set(0,0.035,0.02); strap.castShadow=true; g.add(strap);
@@ -1629,6 +1674,7 @@ class DeathFX{
 
 // ───────── 아이템 정의 ─────────
 const ITEMS={
+  yamato: {r:0.85,windup:0.16,rest:0.42,hover:0.35},
   hand:   {r:0.10,windup:0.05,rest:0.10,hover:0.30},
   slipper:{r:0.13,windup:0.09,rest:0.14,hover:0.24},
   tissue: {r:0.09,windup:0.08,rest:0.24,hover:0.20},
@@ -1641,10 +1687,10 @@ const ITEMS={
   cola:{bait:{radius:2.2,amount:30,spread:0.34,boost:7},hover:0.16},
   rice:{bait:{radius:1.8,amount:18,spread:0.10,boost:5},hover:0.16},
 };
-const SLOT_ORDER=['hand','slipper','tissue','book','pan','spray','flame','vacuum'];
-const LABEL={hand:'徒手',slipper:'拖鞋',tissue:'纸巾',book:'书本',pan:'平底锅',spray:'杀虫喷雾',flame:'火焰',vacuum:'吸尘器',bone:'鸡骨头',cola:'可乐',rice:'米饭'};
+const SLOT_ORDER=['yamato','hand','slipper','tissue','book','pan','spray','flame','vacuum'];
+const LABEL={yamato:'大和460',hand:'徒手',slipper:'拖鞋',tissue:'纸巾',book:'书本',pan:'平底锅',spray:'杀虫喷雾',flame:'火焰',vacuum:'吸尘器',bone:'鸡骨头',cola:'可乐',rice:'米饭'};
 const BAIT_SLOTS=['bone','cola','rice'];
-const LETHAL_ORDER=['hand','tissue','slipper','book','pan','vacuum','spray','flame'];
+const LETHAL_ORDER=['yamato','hand','tissue','slipper','book','pan','vacuum','spray','flame'];
 const ROACH_R=0.05;
 const QUIT_KILLS=40;
 
@@ -1921,12 +1967,19 @@ class Round1{
     }
 
     this.G.shake(
-      item==='pan'||item==='book'
-        ? 0.55
-        : item==='hand'
-          ? 0.18
-          : 0.3
+      item==='yamato'
+        ? 1.85
+        : (item==='pan'||item==='book' ? 0.55 : item==='hand' ? 0.18 : 0.3)
     );
+    if(item==='yamato'){
+      // 主炮全屏火光烟尘粒子喷发
+      for(let i=0;i<24;i++){
+        this.puffs.emit('flame', x+rand(-0.35,0.35), 0.05, z+rand(-0.35,0.35), rand(-1,1), rand(-1,1), 6, rand(3.5,6.5));
+        this.puffs.emit('spray', x+rand(-0.4,0.4), 0.08, z+rand(-0.4,0.4), rand(-1,1), rand(-1,1), 5, rand(2.5,5.0));
+      }
+      // 灼烧焦黑地面巨型印记
+      this.G.paint.splat(x, z, 0, 1, 0.45, 1, 'flame');
+    }
 
     this.scare(x,z,R+0.18);
     this.touch();
@@ -1939,7 +1992,7 @@ class Round1{
 
 
   itemYaw(k){ const U=this.G.camUp; const up=Math.atan2(U.x,U.z);
-    if(k==='pan') return up+Math.PI; if(k==='hand') return up; if(k==='slipper') return up+rand(-0.35,0.35); if(k==='book') return rand(-0.6,0.6); if(k==='tissue') return rand(TAU); return up; }
+    if(k==='yamato') return up+Math.PI; if(k==='pan') return up+Math.PI; if(k==='hand') return up; if(k==='slipper') return up+rand(-0.35,0.35); if(k==='book') return rand(-0.6,0.6); if(k==='tissue') return rand(TAU); return up; }
   press(sx,sy,type,pid){ if(!this.active||this.intro) return; const p=this.floorPoint(sx,sy); if(!p) return; this.touch(); const it=ITEMS[this.item];
     if(it.bait){ this.placeBait(this.item,p.x,p.z); return; }
     if(it.hold){ this.startHold(p.x,p.z,pid); return; }
